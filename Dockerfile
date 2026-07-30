@@ -40,13 +40,10 @@ RUN git clone --depth 1 https://github.com/tyhuang0428/DreamPhysics /opt/DreamPh
     && git clone --depth 1 --recursive https://github.com/graphdeco-inria/gaussian-splatting \
     && pip install --no-cache-dir -e gaussian-splatting/submodules/diff-gaussian-rasterization \
     && pip install --no-cache-dir -e gaussian-splatting/submodules/simple-knn \
-    && python3 -c "
-path = 'utils/threestudio_utils.py'
-src = open(path).read()
-src = src.replace('import tinycudann as tcnn', 'try:\n    import tinycudann as tcnn\nexcept ImportError:\n    tcnn = None')
-src = src.replace('    tcnn.free_temporary_memory()', '    if tcnn is not None:\n        tcnn.free_temporary_memory()')
-open(path, 'w').write(src)
-"
+    && sed -i \
+        -e 's/^import tinycudann as tcnn$/try:\n    import tinycudann as tcnn\nexcept ImportError:\n    tcnn = None/' \
+        -e 's/^    tcnn.free_temporary_memory()$/    if tcnn is not None:\n        tcnn.free_temporary_memory()/' \
+        utils/threestudio_utils.py
 
 # PhysGaussian core requirements.
 # pymeshlab dropped: not imported anywhere in the actual code paths we use
