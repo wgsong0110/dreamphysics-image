@@ -53,6 +53,11 @@ RUN pip install --no-cache-dir \
 
 # tiny-cuda-nn: only used for utils.threestudio_utils.cleanup()'s
 # tcnn.free_temporary_memory() call -- still a hard unconditional import.
+# Its setup.py auto-detects compute capability by querying an actual GPU at
+# build time, which GHA runners don't have ("No CUDA runtime is found") --
+# TCNN_CUDA_ARCHITECTURES (numeric, no dots) bypasses that autodetection,
+# matching TORCH_CUDA_ARCH_LIST above.
+ENV TCNN_CUDA_ARCHITECTURES="75;80;86"
 RUN pip install --no-cache-dir --no-build-isolation \
         "git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch"
 
