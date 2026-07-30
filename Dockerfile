@@ -11,8 +11,17 @@
 # DreamPhysics's upstream requirements.txt (copied wholesale from threestudio)
 # but are NEVER actually imported by ms_simulation.py/svd_simulation.py or
 # anything they pull in (verified by grepping the whole repo) -- skipped here
-# to avoid building nvdiffrast's CUDA extension for nothing. tiny-cuda-nn IS
-# needed (utils/threestudio_utils.py imports tinycudann unconditionally).
+# to avoid building nvdiffrast's CUDA extension for nothing.
+#
+# tiny-cuda-nn: utils/threestudio_utils.py imports it unconditionally, but
+# the ONLY use anywhere in the repo is a single tcnn.free_temporary_memory()
+# call inside cleanup() (a GPU-memory-pool cleanup optimization, not required
+# for correctness). Its CUDA extension is large and fragile to cross-compile
+# without a real GPU present (hit 3 distinct build failures across attempts:
+# GPU-arch autodetection needing a real device, then a <filesystem> header/
+# host-compiler mismatch) -- not worth fighting for an optional memory-free
+# call, so the import + call are patched to be optional instead of building
+# the real package.
 FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-devel
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -30,7 +39,14 @@ RUN git clone --depth 1 https://github.com/tyhuang0428/DreamPhysics /opt/DreamPh
     && cd /opt/DreamPhysics \
     && git clone --depth 1 --recursive https://github.com/graphdeco-inria/gaussian-splatting \
     && pip install --no-cache-dir -e gaussian-splatting/submodules/diff-gaussian-rasterization \
-    && pip install --no-cache-dir -e gaussian-splatting/submodules/simple-knn
+    && pip install --no-cache-dir -e gaussian-splatting/submodules/simple-knn \
+    && python3 -c "
+path = 'utils/threestudio_utils.py'
+src = open(path).read()
+src = src.replace('import tinycudann as tcnn', 'try:\n    import tinycudann as tcnn\nexcept ImportError:\n    tcnn = None')
+src = src.replace('    tcnn.free_temporary_memory()', '    if tcnn is not None:\n        tcnn.free_temporary_memory()')
+open(path, 'w').write(src)
+"
 
 # PhysGaussian core requirements.
 # pymeshlab dropped: not imported anywhere in the actual code paths we use
@@ -50,15 +66,5 @@ RUN pip install --no-cache-dir \
         pytorch-lightning==2.0.0 omegaconf==2.3.0 jaxtyping typeguard \
         "diffusers<0.20" transformers==4.30.2 accelerate \
         tensorboard matplotlib "imageio>=2.28.0" "imageio[ffmpeg]" torchmetrics
-
-# tiny-cuda-nn: only used for utils.threestudio_utils.cleanup()'s
-# tcnn.free_temporary_memory() call -- still a hard unconditional import.
-# Its setup.py auto-detects compute capability by querying an actual GPU at
-# build time, which GHA runners don't have ("No CUDA runtime is found") --
-# TCNN_CUDA_ARCHITECTURES (numeric, no dots) bypasses that autodetection,
-# matching TORCH_CUDA_ARCH_LIST above.
-ENV TCNN_CUDA_ARCHITECTURES="75;80;86"
-RUN pip install --no-cache-dir --no-build-isolation \
-        "git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch"
 
 WORKDIR /workspace
