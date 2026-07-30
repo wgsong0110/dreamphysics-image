@@ -33,9 +33,13 @@ RUN git clone --depth 1 https://github.com/tyhuang0428/DreamPhysics /opt/DreamPh
     && pip install --no-cache-dir -e gaussian-splatting/submodules/simple-knn
 
 # PhysGaussian core requirements.
+# pymeshlab dropped: not imported anywhere in the actual code paths we use
+# (grepped the whole repo) and pymeshlab==2023.12.post1 has no wheel for this
+# base image's Python (3.10) anyway -- upstream requirements.txt pulls it in
+# from PhysGaussian's mesh-processing utilities we never call.
 RUN pip install --no-cache-dir \
         h5py==3.10.0 "numpy==1.24.1" opencv_python==4.8.1.78 opencv_python_headless==4.9.0.80 \
-        Pillow==10.2.0 plyfile==1.0.3 PyMCubes==0.1.4 pymeshlab==2023.12.post1 \
+        Pillow==10.2.0 plyfile==1.0.3 PyMCubes==0.1.4 \
         scipy==1.12.0 setuptools==68.0.0 taichi==1.5.0 tqdm==4.66.1 warp-lang==0.10.1
 
 # Minimal slice of threestudio's requirements actually exercised by
